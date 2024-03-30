@@ -1,53 +1,70 @@
 #!/usr/bin/python3
-"""
-Defines module serialize and deserialize
-instances.
-"""
-from json import dumps, loads
-from os.path import isfile
+'''
+    Define class FileStorage (updated module)
+'''
+
+
+import json
+import models
 
 
 class FileStorage:
-    """
-    Define mbbr for serializing instances
-    """
-
     __file_path = "file.json"
     __objects = {}
 
-    def all_obj(self):
-        """ Return object"""
-        return (FileStorage.__objects)
+    def all(self, cls=None):
+        new_dict = {}
+        if cls is None:
+            return self.__objects
 
-    def nw_obj(self, obj):
-        """ set object value"""
-        key = f"{obj.__class__.__name__}.{obj.id}"
-        FileStorage.__objects[key] = obj
+        if cls != "":
+            for k, v in self.__objects.items():
+                if cls == k.split(".")[0]:
+                    new_dict[k] = v
+            return new_dict
+        else:
+            return self.__objects
 
-    def save_obj(self):
-        """ save objects to a JSON file """
-        objects = {}
-        for k, v in FileStorage.__objects.items():
-            objects[k] = v.to_dict()
-        with open(FileStorage.__file_path, "w") as file:
-            file.write(dumps(objects))
+    def new(self, obj):
+        key = str(obj.__class__.__name__) + "." + str(obj.id)
+        value_dict = obj
+        FileStorage.__objects[key] = value_dict
 
-    def re_load(self):
-        """ Deserializes the JSON file into object(s) """
-        objects = {}
+    def save(self):
+        objects_dict = {}
+        for key, val in FileStorage.__objects.items():
+            objects_dict[key] = val.to_dict()
+        with open(FileStorage.__file_path, mode='w', encoding="UTF8") as fd:
+            json.dump(objects_dict, fd)
 
-        if (isfile(FileStorage.__file_path)):
-            with open(FileStorage.__file_path, "r") as file:
-                objects = loads(file.read())
-            from models.base_model import BaseModel
-            from models.user import User
-            from models.stt import State
-            from models.ame import Ame
-            from models.cty import Cty
-            from models.plc import Plc
-            from models.rev import Rev
-            for key, value in objects.items():
-                class_name = value["__class__"]
-                del value["__class__"]
-                FileStorage.__objects[key] = eval(class_name + "(**value)")
+    def reload(self):
+        try:
+            with open(FileStorage.__file_path, encoding="UTF8") as fd:
+                FileStorage.__objects = json.load(fd)
+            for key, val in FileStorage.__objects.items():
+                class_name = val["__class__"]
+                class_name = models.classes[class_name]
+                FileStorage.__objects[key] = class_name(**val)
+        except FileNotFoundError:
+            pass
+    def delete(self, obj=None):
+        if obj is not None:
+            key = str(obj.__class__.__name__) + "." + str(obj.id)
+            FileStorage.__objects.pop(key, None)
+            self.save()
 
+    def close(self):
+        self.reload()
+
+    def get(self, cls, id):
+        obj_dict = self.all(cls)
+        for k, v in obj_dict.items():
+            matchstring = cls + '.' + id
+            if k == matchstring:
+                return v
+
+        return None
+
+    def count(self, cls=None):
+        obj_dict = self.all(cls)
+        return len(obj_dict)
